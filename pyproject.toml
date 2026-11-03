@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apihub-pro"
+version = "2.0.0"
+description = "Enterprise Dynamic API Gateway, Distributed Redis Rate Limiting, RBAC/MFA Security, Analytics & API Marketplace"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "MrKhan025"}]
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "pydantic>=2.5.0",
+    "httpx>=0.26.0",
+]
+
+[project.scripts]
+apihub = "apihub.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B303", "B608"]

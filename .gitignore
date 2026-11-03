@@ -1,0 +1,32 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables & secrets (NEVER COMMIT)
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/

@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-apihub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_env}
+      POSTGRES_DB: ${POSTGRES_DB:-apihub_pro}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apihub} -d ${POSTGRES_DB:-apihub_pro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  apihub-gateway:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${APIHUB_PORT:-8000}:8000"
+    environment:
+      APIHUB_ENV: ${APIHUB_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://apihub:change_me_in_env@postgres:5432/apihub_pro}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_ENABLED: "true"
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "10"
+      DB_POOL_PRE_PING: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  apihub-worker-prod:
+    build: .
+    profiles: ["production"]
+    restart: always
+    command: ["python3", "main.py", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      APIHUB_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://apihub:change_me_in_env@postgres:5432/apihub_pro}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DB_SSL_MODE: require
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
