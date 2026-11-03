@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: apihub-pro-pdb
+  namespace: apihub-pro
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: apihub-pro
+      component: gateway

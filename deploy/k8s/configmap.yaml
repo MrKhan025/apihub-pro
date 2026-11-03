@@ -1,1 +1,14 @@
-
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apihub-pro-config
+  namespace: apihub-pro
+data:
+  APIHUB_ENV: "production"
+  APIHUB_PORT: "8000"
+  DB_POOL_SIZE: "25"
+  DB_MAX_OVERFLOW: "15"
+  DB_POOL_PRE_PING: "true"
+  REDIS_ENABLED: "true"
+  MAX_REQUEST_BODY_BYTES: "1048576"
+  DEFAULT_GATEWAY_TIMEOUT_MS: "5000"

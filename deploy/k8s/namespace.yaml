@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apihub-pro
+  labels:
+    app.kubernetes.io/name: apihub-pro
+    app.kubernetes.io/version: "3.0.0"

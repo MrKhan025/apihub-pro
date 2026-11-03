@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: apihub-pro-service
+  namespace: apihub-pro
+  labels:
+    app: apihub-pro
+spec:
+  type: ClusterIP
+  selector:
+    app: apihub-pro
+    component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
