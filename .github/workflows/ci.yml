@@ -1,4 +1,4 @@
-name: API-Hub-Pro CI & Security Audit
+name: APIHub-Pro Enterprise CI & Security Audit
 
 on:
   push:
@@ -9,10 +9,14 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  PYTHONUNBUFFERED: "1"
+
 jobs:
   test-and-security:
     name: Unit Tests, Integration Tests & Security Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m venv .venv
+          python3 -m venv .venv
           .venv/bin/pip install --upgrade pip
           .venv/bin/pip install -r requirements-dev.txt
 
@@ -33,7 +37,7 @@ jobs:
           PYTHONPATH=. .venv/bin/python main.py migrate
           PYTHONPATH=. .venv/bin/python main.py seed-demo
 
-      - name: Run Unit and Integration Test Suite
+      - name: Run Unit, Integration & Security Test Suite
         run: |
           PYTHONPATH=. .venv/bin/pytest -v
 
@@ -43,9 +47,16 @@ jobs:
 
       - name: Run Bandit Static Security Analysis
         run: |
-          .venv/bin/bandit -q -ll -s B101,B303,B608 -r apihub
+          .venv/bin/bandit -q -ll -s B101,B104,B303,B310,B608 -r apihub
 
       - name: Verify Zero Committed Credentials
         run: |
-          test ! -f .env
-          ! grep -RInE "(AKIA[0-9A-Z]{16}|BEGIN RSA PRIVATE KEY)" apihub/ tests/ web/
+          if [ -f .env ]; then
+            echo "Error: .env file must not be committed"
+            exit 1
+          fi
+          if grep -RInE "(AKIA[0-9A-Z]{16}|BEGIN RSA PRIVATE KEY)" apihub/ tests/ web/; then
+            echo "Error: Potential hardcoded credential found"
+            exit 1
+          fi
+          echo "Zero committed credentials verified."
