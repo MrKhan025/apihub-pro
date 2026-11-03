@@ -1,1 +1,51 @@
+name: API-Hub-Pro CI & Security Audit
 
+on:
+  push:
+    branches: ["main", "master", "feature/**"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-security:
+    name: Unit Tests, Integration Tests & Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements-dev.txt
+
+      - name: Run database migrations & seed verification
+        run: |
+          PYTHONPATH=. .venv/bin/python main.py migrate
+          PYTHONPATH=. .venv/bin/python main.py seed-demo
+
+      - name: Run Unit and Integration Test Suite
+        run: |
+          PYTHONPATH=. .venv/bin/pytest -v
+
+      - name: Run Automated Security Auditor & Audit Chain Verification
+        run: |
+          PYTHONPATH=. .venv/bin/python main.py security-audit
+
+      - name: Run Bandit Static Security Analysis
+        run: |
+          .venv/bin/bandit -q -ll -s B101,B303,B608 -r apihub
+
+      - name: Verify Zero Committed Credentials
+        run: |
+          test ! -f .env
+          ! grep -RInE "(AKIA[0-9A-Z]{16}|BEGIN RSA PRIVATE KEY)" apihub/ tests/ web/
