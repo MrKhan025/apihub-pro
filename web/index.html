@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API-Hub-Pro v2.0 — Enterprise Gateway, Analytics &amp; Marketplace</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">AHP</div>
+        <div>
+          <h1>apihub-pro</h1>
+          <span class="version-pill">v2.0 Advanced Engine</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <button class="nav-btn active" data-tab="overview">Live Metrics &amp; Analytics</button>
+        <button class="nav-btn" data-tab="gateway">Dynamic Gateway &amp; Editor</button>
+        <button class="nav-btn" data-tab="explorer">Interactive API Explorer</button>
+        <button class="nav-btn" data-tab="keys">API Keys &amp; Rotation</button>
+        <button class="nav-btn" data-tab="projects">Projects &amp; RBAC Users</button>
+        <button class="nav-btn" data-tab="marketplace">API Marketplace &amp; Plans</button>
+        <button class="nav-btn" data-tab="webhooks">Webhooks &amp; Retries</button>
+        <button class="nav-btn" data-tab="security">Security Audit &amp; MFA</button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="seedDemoBtn" class="btn btn-secondary full-width">Load Demo Workspace</button>
+        <div id="infraBadge" class="infra-status">Redis &amp; DB Ready</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <h2 id="pageTitle">Live Operational Metrics &amp; Analytics</h2>
+          <p class="subtitle">Dynamic API Gateway · Distributed Rate Limiting · Zero-Trust Security · Marketplace</p>
+        </div>
+        <div class="topbar-actions">
+          <a href="/api/v2/analytics/export?format=csv" class="btn btn-outline" target="_blank">Export CSV</a>
+          <a href="/api/v2/analytics/export?format=json" class="btn btn-outline" target="_blank">Export JSON</a>
+          <button id="refreshAllBtn" class="btn btn-primary">Refresh Live Data</button>
+        </div>
+      </header>
+
+      <!-- TAB 1: LIVE METRICS & ANALYTICS -->
+      <section id="tab-overview" class="tab-panel active">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Gateway Requests</span>
+            <strong id="kpiTotalReq" class="kpi-value">0</strong>
+            <span id="kpiRpm" class="kpi-sub">Current RPM: 0</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Latency Percentiles (p50 / p95 / p99)</span>
+            <strong id="kpiLatencies" class="kpi-value">0 / 0 / 0 ms</strong>
+            <span id="kpiAvgLat" class="kpi-sub">Avg: 0 ms</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Gateway Error Rate</span>
+            <strong id="kpiErrorRate" class="kpi-value">0.0%</strong>
+            <span id="kpiStatusBreakdown" class="kpi-sub">2xx: 0 | 4xx: 0 | 5xx: 0</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Security &amp; Audit Score</span>
+            <strong id="kpiSecurityScore" class="kpi-value">100/100</strong>
+            <span id="kpiAuditStatus" class="kpi-sub">HMAC Chain Verified</span>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3>Latency Percentiles Chart (Live SVG)</h3>
+            <div id="svgChartContainer" class="chart-box">Loading chart...</div>
+          </div>
+          <div class="card">
+            <h3>Endpoint Performance &amp; Cache Hit Rates</h3>
+            <div class="table-wrap">
+              <table id="endpointPerfTable">
+                <thead>
+                  <tr>
+                    <th>Route</th>
+                    <th>Req</th>
+                    <th>Err %</th>
+                    <th>Cache %</th>
+                    <th>p50 / p95 / p99</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: DYNAMIC GATEWAY & ENDPOINT EDITOR -->
+      <section id="tab-gateway" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Dynamic API Endpoint Editor (No-Code Route Builder)</h3>
+            <form id="createEndpointForm" class="form-stack">
+              <div class="form-row">
+                <label>Endpoint Name <input type="text" id="epName" value="Customer Profile Service" required /></label>
+                <label>Version <input type="text" id="epVersion" value="v2" required /></label>
+              </div>
+              <div class="form-row">
+                <label>HTTP Method
+                  <select id="epMethod">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                  </select>
+                </label>
+                <label>Path <input type="text" id="epPath" value="/customers/profile" required /></label>
+              </div>
+              <div class="form-row">
+                <label>Lifecycle State
+                  <select id="epLifecycle">
+                    <option value="active">active</option>
+                    <option value="draft">draft</option>
+                    <option value="deprecated">deprecated</option>
+                    <option value="retired">retired</option>
+                  </select>
+                </label>
+                <label>Timeout (ms) <input type="number" id="epTimeout" value="3000" min="50" max="30000" /></label>
+                <label>Rate Limit (RPM) <input type="number" id="epRpm" value="120" min="1" /></label>
+              </div>
+              <label>Mock JSON Response Body
+                <textarea id="epMockBody" rows="3">{"customer_id": "cust_901", "tier": "enterprise", "ssn_last4": "987654321"}</textarea>
+              </label>
+              <label>Response Transformation Rules (JSON)
+                <textarea id="epRespTransform" rows="3">{"mask_fields": ["ssn_last4"], "wrap_envelope": true}</textarea>
+              </label>
+              <button type="submit" class="btn btn-primary">Register Dynamic Endpoint</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Registered Gateway Endpoints</h3>
+            <div class="table-wrap">
+              <table id="gatewayEndpointsTable">
+                <thead>
+                  <tr>
+                    <th>Method &amp; Route</th>
+                    <th>Lifecycle</th>
+                    <th>Timeout</th>
+                    <th>RPM</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: INTERACTIVE API EXPLORER -->
+      <section id="tab-explorer" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Gateway Request Builder</h3>
+            <form id="apiExplorerForm" class="form-stack">
+              <div class="form-row">
+                <label>Method
+                  <select id="expMethod">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                  </select>
+                </label>
+                <label>Gateway Path <input type="text" id="expPath" value="/gateway/v2/fx/quotes" required /></label>
+              </div>
+              <label>X-API-Key Header (Optional for public routes)
+                <input type="text" id="expApiKey" placeholder="ahp_live_..." />
+              </label>
+              <label>Request JSON Body (for POST/PUT)
+                <textarea id="expBody" rows="4">{"amt": 250.00, "customer": "MrKhan"}</textarea>
+              </label>
+              <button type="submit" class="btn btn-primary">Send Gateway Request</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Live Gateway Response &amp; Rate-Limit Headers</h3>
+            <pre id="explorerOutput" class="code-box">Click "Send Gateway Request" to inspect status, X-RateLimit-* headers, and transformed response payload.</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: API KEYS & GRACE-PERIOD ROTATION -->
+      <section id="tab-keys" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Issue Scoped API Key</h3>
+            <form id="createKeyForm" class="form-stack">
+              <label>Key Name <input type="text" id="keyName" value="Production Microservice Key" required /></label>
+              <div class="form-row">
+                <label>Rate Limit (RPM) <input type="number" id="keyRpm" value="120" /></label>
+                <label>Expiration (Days) <input type="number" id="keyTtl" value="90" /></label>
+              </div>
+              <button type="submit" class="btn btn-primary">Issue New API Key</button>
+            </form>
+            <div id="issuedKeyBanner" class="secret-banner hidden"></div>
+          </div>
+          <div class="card">
+            <h3>Active &amp; Rotated API Keys</h3>
+            <div class="table-wrap">
+              <table id="apiKeysTable">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Prefix</th>
+                    <th>Status</th>
+                    <th>RPM</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: PROJECTS & RBAC USERS -->
+      <section id="tab-projects" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Multi-Project Workspaces</h3>
+            <div class="table-wrap">
+              <table id="projectsTable">
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Slug</th>
+                    <th>Plan Tier</th>
+                    <th>RPM Quota</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <h3>RBAC Users &amp; MFA Status</h3>
+            <div class="table-wrap">
+              <table id="usersTable">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>RBAC Role</th>
+                    <th>MFA</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: API MARKETPLACE & SUBSCRIPTION PLANS -->
+      <section id="tab-marketplace" class="tab-panel">
+        <div class="kpi-grid" id="plansContainer"></div>
+        <div class="card">
+          <h3>Published Marketplace APIs</h3>
+          <div class="table-wrap">
+            <table id="marketplaceTable">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Sample Route</th>
+                  <th>Required Plan</th>
+                  <th>Subscribers</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: WEBHOOKS & RETRY POLICIES -->
+      <section id="tab-webhooks" class="tab-panel">
+        <div class="card">
+          <h3>Configured Webhooks &amp; Exponential Retry Policies</h3>
+          <div class="table-wrap">
+            <table id="webhooksTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Target URL</th>
+                  <th>Retry Policy</th>
+                  <th>Events</th>
+                  <th>Test Dispatch</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 8: SECURITY AUDIT & MFA -->
+      <section id="tab-security" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Automated Security Audit Report</h3>
+            <button id="runSecurityAuditBtn" class="btn btn-primary">Run Automated Security Scan</button>
+            <pre id="securityAuditOutput" class="code-box">Running automated security checks...</pre>
+          </div>
+          <div class="card">
+            <h3>Tamper-Evident HMAC-SHA256 Audit Trail</h3>
+            <div class="table-wrap">
+              <table id="auditLogsTable">
+                <thead>
+                  <tr>
+                    <th>Event</th>
+                    <th>Severity</th>
+                    <th>Description</th>
+                    <th>Entry Hash</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
