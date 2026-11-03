@@ -1,89 +1,81 @@
-# API-Hub-Pro (`apihub-pro`) v2.0 — Complete REST API Reference
+# APIHub-Pro (`apihub-pro`) v3.0 — Complete REST & GraphQL API Contracts
 
-Every v1 backward-compatible route and v2.0 Advanced API Engine endpoint is documented below.
-
----
-
-## 1. Backward-Compatible v1 Endpoints
-
-| Method | Path | Description |
-| :--- | :--- | :--- |
-| `GET` | `/health` | Returns service health, active database migration revision, and Redis backend status |
-| `GET` | `/api/v1/status` | Legacy v1 status check (`backward_compatible: true`) |
-| `GET` | `/api/v1/endpoints` | Lists registered endpoints (`?project_id=optional`) |
-| `GET` | `/api/v1/projects` | Lists configured API projects |
-| `GET` | `/api/v1/keys` | Lists API key metadata without exposing secret hashes |
+Every **v1** backward-compatible route, **v2** Advanced Gateway endpoint, and **v3** Enterprise Platform endpoint is documented below.
 
 ---
 
-## 2. Dynamic API Gateway & Runtime Execution (`v2`)
+## 1. AI Gateway Endpoints (`v3`)
 
-| Method | Path | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/v2/gateway/endpoints` | Dynamically register a new API endpoint without writing route code. Supports `version`, `lifecycle_state` (`draft`, `active`, `deprecated`, `retired`), `timeout_ms`, `cache_ttl_seconds`, `request_transform`, and `response_transform`. |
-| `GET` | `/api/v2/gateway/endpoints` | List dynamic endpoints filtered by `project_id`, `version`, or `lifecycle_state`. |
-| `GET` | `/api/v2/gateway/endpoints/{endpoint_id}` | Retrieve full configuration of a single dynamic endpoint. |
-| `PUT` | `/api/v2/gateway/endpoints/{endpoint_id}` | Update endpoint version, lifecycle state, timeout, or transformation rules in place. |
-| `DELETE` | `/api/v2/gateway/endpoints/{endpoint_id}` | Remove a dynamic endpoint and record an audit log entry. |
-| `ANY` | `/gateway/{version}/{endpoint_path:path}` | **Dynamic Runtime Dispatcher:** Executes any registered `GET`, `POST`, `PUT`, `PATCH`, or `DELETE` endpoint. Enforces API keys (`X-API-Key` or `Bearer`), Redis sliding-window rate limits (`X-RateLimit-*` headers), lifecycle headers (`Deprecation`, `Sunset`, `410 Gone`), transformations, and timeouts (`504 Gateway Timeout`). |
+| Method | Path | Request / Query Contract | Response Contract |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v3/ai/models` | None | `{ "count": 8, "models": [{ "id": "openai/gpt-4o", "provider": "openai", "model": "gpt-4o", "input_cost_per_1k_usd": 0.0025, "output_cost_per_1k_usd": 0.01 }] }` |
+| `POST` | `/api/v3/ai/chat/completions` | `{ "project_id": "prj_...", "provider": "openai\|azure_openai\|claude\|gemini\|deepseek", "model": "gpt-4o", "messages": [{"role":"user","content":"..."}], "redact_pii": true, "block_injections": true }` | `{ "id": "ailog_...", "provider": "openai", "filter": {"action":"allowed\|redacted","pii_redacted":false}, "choices": [...], "usage": {"prompt_tokens":12,"completion_tokens":24,"total_tokens":36,"cost_usd":0.00027} }` (`400` on prompt injection) |
+| `POST` | `/api/v3/ai/filter-check` | `{ "text": "...", "redact_pii": true, "block_injections": true }` | `{ "allowed": true, "action": "allowed\|redacted\|blocked", "violations": [], "pii_redacted": false, "sanitized_text": "..." }` |
+| `GET` | `/api/v3/ai/analytics` | `?project_id=optional` | `{ "total_requests": 6, "blocked_prompts": 1, "pii_redacted_prompts": 5, "tokens": {"prompt_tokens":...,"completion_tokens":...,"total_tokens":...}, "total_cost_usd": 0.0018, "by_provider": {...} }` |
 
 ---
 
-## 3. Security, Authentication, RBAC, MFA & API Key Rotation (`v2`)
+## 2. Enterprise API Monetization & Stripe Billing (`v3`)
 
-| Method | Path | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/v2/auth/register` | Create a new user with RBAC role (`admin`, `developer`, `auditor`, `viewer`). |
-| `POST` | `/api/v2/auth/login` | Authenticate user with brute-force IP/account throttling and optional `totp_code`. |
-| `POST` | `/api/v2/auth/mfa/setup` | Provision RFC 6238 TOTP secret, `otpauth://` URI, and 6 single-use backup recovery codes. |
-| `POST` | `/api/v2/auth/mfa/verify` | Verify a 6-digit TOTP code and activate mandatory MFA on the user account. |
-| `POST` | `/api/v2/auth/password-reset/request` | Issue a time-bound, single-use password reset token. |
-| `POST` | `/api/v2/auth/password-reset/confirm` | Redeem a password reset token to set a new password and clear lockouts. |
-| `GET` | `/api/v2/users` | List registered users, RBAC roles, permissions, and MFA status. |
-| `POST` | `/api/v2/projects` | Create a multi-project workspace with plan quotas (`free`, `pro`, `enterprise`). |
-| `GET` | `/api/v2/projects` | List projects accessible to a user. |
-| `GET` | `/api/v2/projects/{project_id}` | Inspect project details and RBAC member list (`owner`, `editor`, `reader`). |
-| `POST` | `/api/v2/projects/{project_id}/members` | Grant or update project-level access (`owner`, `editor`, `reader`) for a user. |
-| `POST` | `/api/v2/keys` | Issue a scoped API key (`ahp_live_...`) with configurable RPM and expiration TTL. |
-| `GET` | `/api/v2/keys` | List API keys and rotation status. |
-| `POST` | `/api/v2/keys/{key_id}/rotate` | Zero-downtime API key rotation: issues a new key immediately while keeping the old key valid in `rotated_grace` status during `grace_period_seconds`. |
-| `POST` | `/api/v2/keys/{key_id}/revoke` | Immediately revoke an API key. |
-| `GET` | `/api/v2/security/audit-logs` | Query tamper-evident HMAC-SHA256 hash-chained security audit trail. |
-| `GET` | `/api/v2/security/verify-chain` | Cryptographically verify every link (`prev_hash` -> `entry_hash`) in the audit log chain. |
-| `POST` | `/api/v2/security/automated-audit` | Execute automated security auditing across keys, endpoints, MFA, timeouts, and audit chain. |
+| Method | Path | Request / Query Contract | Response Contract |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v3/billing/tiers` | None | Lists `free`, `pro`, `enterprise`, and `ai_scale` pricing tiers |
+| `POST` | `/api/v3/billing/stripe/checkout-session` | `{ "project_id": "prj_...", "plan_tier": "enterprise" }` | `{ "session_id": "cs_live_...", "checkout_url": "https://checkout.stripe.com/...", "amount_usd": 249.0 }` |
+| `POST` | `/api/v3/billing/stripe/webhook` | Header `Stripe-Signature: t=...,v1=...` + raw JSON event | `{ "received": true, "event_type": "invoice.paid", "verified": true }` |
+| `POST` | `/api/v3/billing/usage` | `{ "project_id": "prj_...", "metric_type": "api_requests", "quantity": 50000, "unit_price_usd": 0.0002 }` | `{ "id": "usg_...", "total_usd": 10.0 }` |
+| `POST` | `/api/v3/billing/invoices/generate` | `{ "project_id": "prj_...", "plan_tier": "pro", "auto_pay_via_stripe": true }` | Itemized invoice with `base_fee_usd`, `metered_usage_usd`, `ai_usage_usd`, `tax_usd`, `total_usd`, and `line_items` |
+| `GET` | `/api/v3/billing/invoices` | `?project_id=optional` | Lists generated invoices |
+| `GET` | `/api/v3/billing/revenue` | None | `{ "mrr_usd": ..., "arr_usd": ..., "arpu_usd": ..., "collected_invoice_revenue_usd": ..., "metered_overage_revenue_usd": ..., "ai_gateway_revenue_usd": ... }` |
 
 ---
 
-## 4. Webhooks & Retry Policies (`v2`)
+## 3. Advanced Gateway Resilience & Service Discovery (`v3`)
 
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `POST` | `/api/v2/webhooks` | Register a project webhook with HMAC-SHA256 signing secret and retry policy (`exponential`, `linear`, `fixed`). |
-| `GET` | `/api/v2/webhooks` | List configured webhooks for a project. |
-| `POST` | `/api/v2/webhooks/{webhook_id}/trigger` | Dispatch an event with `X-APIHub-Signature-256` header and automatic retry execution. |
-| `GET` | `/api/v2/webhooks/{webhook_id}/deliveries` | Inspect delivery attempts, HTTP status codes, latencies, and backoff schedules. |
+| `POST` | `/api/v3/gateway/canary` | Create a weighted canary deployment splitting traffic between `stable_version` and `canary_version` with automatic rollback threshold (`auto_rollback_error_pct`) |
+| `GET` | `/api/v3/gateway/canary` | List active and rolled-back canary deployments |
+| `POST` | `/api/v3/gateway/canary/{canary_id}/route` | Route a request across stable/canary versions (supports `X-Canary: true` sticky header and automatic rollback on error spike) |
+| `POST` | `/api/v3/gateway/shadow` | Mirror a live request to a shadow version and return status & payload comparison diffs |
+| `POST` | `/api/v3/gateway/replay/capture` | Capture a request into the `replay_vault` |
+| `POST` | `/api/v3/gateway/replay/{capture_id}/execute` | Deterministically replay a captured request against current or target version |
+| `POST` | `/api/v3/gateway/circuit-breakers` | Configure a 3-state circuit breaker (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`) |
+| `POST` | `/api/v3/gateway/circuit-breakers/{service_name}/record` | Record call success/failure and evaluate circuit breaker state transitions |
+| `POST` | `/api/v3/gateway/discovery/register` | Register a microservice instance in the dynamic Service Discovery registry |
+| `GET` | `/api/v3/gateway/discovery/services` | List registered microservice instances and latency health |
+| `POST` | `/api/v3/gateway/discovery/resolve/{service_name}` | Resolve an optimal instance via `least_latency` or `round_robin` |
 
 ---
 
-## 5. Live Operational Analytics & Marketplace (`v2`)
+## 4. Threat Intelligence, Device Fingerprinting & JWKS Rotation (`v3`)
 
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v2/analytics/summary` | Retrieve total requests, current/average RPM, 2xx/4xx/5xx breakdown, error rate %, `p50`/`p90`/`p95`/`p99` latency percentiles, RPM time series, and daily usage. |
-| `GET` | `/api/v2/analytics/endpoints` | Per-endpoint request volume, error rate, cache hit rate, and latency percentiles. |
-| `GET` | `/api/v2/analytics/chart.svg` | Live SVG latency percentile bar chart. |
-| `GET` | `/api/v2/analytics/export` | Export analytics report as downloadable CSV (`?format=csv`) or JSON (`?format=json`). |
-| `GET` | `/api/v2/marketplace/plans` | List available subscription plans (`Free`, `Pro`, `Enterprise`) and quotas. |
-| `POST` | `/api/v2/marketplace/listings` | Publish an API product to the API Marketplace catalog. |
-| `GET` | `/api/v2/marketplace/listings` | Browse published API Marketplace products (`?category=optional`). |
-| `POST` | `/api/v2/marketplace/subscribe` | Subscribe a project to a subscription tier or marketplace listing and upgrade quotas. |
+| `POST` | `/api/v3/security/evaluate-request` | Compute `SHA-256` device fingerprint (`fp_...`), evaluate `0–100` risk score against threat intelligence & velocity limits, and return enforcement action (`allow`, `step_up_mfa`, `block`) |
+| `GET` | `/api/v3/security/threat-events` | List recorded threat intelligence and API abuse events |
+| `GET` | `/.well-known/jwks.json` | Publish active and grace-period public JSON Web Keys (`JWKS`) |
+| `POST` | `/api/v3/security/jwt/rotate` | Rotate the active JWT signing key (`kid`) with zero-downtime `rotated_verify_only` grace window |
+| `POST` | `/api/v3/security/jwt/issue` | Sign and issue a `kid`-tagged JWT |
+| `POST` | `/api/v3/security/jwt/verify` | Verify a JWT across active and grace-period `kid` keys |
 
 ---
 
-## 6. Infrastructure & Database Migrations (`v2`)
+## 5. Observability, Developer Experience (DX), GraphQL Federation & DDD/CQRS (`v3`)
 
 | Method | Path | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v2/infra/status` | Inspect PostgreSQL/SQLite pool settings, Alembic migration state, Redis mode, and security limits. |
-| `POST` | `/api/v2/infra/migrate` | Apply Alembic database schema migrations up to `head`. |
-| `POST` | `/api/v2/infra/seed-demo` | Idempotently initialize demo users, projects, dynamic endpoints, marketplace APIs, and metrics. |
+| `GET` | `/metrics` | Prometheus text exposition format metrics (`apihub_http_requests_total`, `apihub_http_latency_milliseconds`, `apihub_ai_tokens_total`, `apihub_ai_cost_usd_total`, `apihub_circuit_breaker_state`) |
+| `GET` | `/api/v3/observability/traces` | List OpenTelemetry W3C `traceparent` distributed traces and child spans |
+| `GET` | `/api/v3/observability/traces/{trace_id}` | Inspect a specific distributed trace and its span tree |
+| `POST` | `/api/v3/dx/sdk-generate` | Generate client SDK code in `python`, `typescript`, `go`, or `curl` |
+| `POST` | `/api/v3/dx/webhook-simulate` | Simulate signed webhook delivery and verify signature tamper detection |
+| `POST` | `/api/v3/graphql` | Apollo GraphQL Federation v2 endpoint (`_service { sdl }`, `_entities`, `projects`, `endpoints`, `aiModels`, `analyticsSummary`) |
+| `GET` | `/api/v3/architecture/events` | Query the CQRS / Event Sourcing domain event stream |
+| `GET` | `/api/v3/architecture/replay/{aggregate_id}` | Reconstruct aggregate state by replaying all immutable `DomainEvent` records |
+
+---
+
+## 6. Preserved v2 & v1 Endpoints (100% Backward Compatible)
+
+- **v1:** `GET /health`, `GET /api/v1/status`, `GET /api/v1/endpoints`, `GET /api/v1/projects`, `GET /api/v1/keys`
+- **v2:** `/api/v2/gateway/endpoints`, `/gateway/{version}/{path}`, `/api/v2/auth/*`, `/api/v2/projects/*`, `/api/v2/keys/*`, `/api/v2/webhooks/*`, `/api/v2/analytics/*`, `/api/v2/marketplace/*`, `/api/v2/security/*`, `/api/v2/infra/*`
