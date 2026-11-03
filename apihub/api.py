@@ -118,16 +118,37 @@ class SecurityAndAbuseMiddleware:
                 return {"type": "http.request", "body": raw_body, "more_body": False}
             return {"type": "http.disconnect"}
 
+        from apihub.observability import trace_collector
+        req_headers_dict = {
+            k.decode("latin-1").lower(): v.decode("latin-1")
+            for k, v in (scope.get("headers") or [])
+        }
+        trace_ctx = trace_collector.parse_or_create_traceparent(req_headers_dict.get("traceparent"))
+        start_perf = time.perf_counter()
+        captured_status = 200
+
         async def send_with_security_headers(message: Dict[str, Any]) -> None:
+            nonlocal captured_status
             if message.get("type") == "http.response.start":
+                captured_status = int(message.get("status", 200))
                 raw_headers = list(message.get("headers", []))
                 raw_headers.append((b"x-content-type-options", b"nosniff"))
                 raw_headers.append((b"x-frame-options", b"SAMEORIGIN"))
                 raw_headers.append((b"x-apihub-version", __version__.encode("utf-8")))
+                raw_headers.append((b"traceparent", trace_ctx["traceparent"].encode("utf-8")))
+                raw_headers.append((b"x-trace-id", trace_ctx["trace_id"].encode("utf-8")))
                 message["headers"] = raw_headers
             await send(message)
 
         await self.app(scope, replay_receive, send_with_security_headers)
+        dur_ms = (time.perf_counter() - start_perf) * 1000.0
+        trace_collector.record_trace(
+            trace_ctx=trace_ctx,
+            method=scope.get("method", "GET"),
+            path=path,
+            status_code=captured_status,
+            duration_ms=dur_ms,
+        )
 
 
 app.add_middleware(SecurityAndAbuseMiddleware)
@@ -999,3 +1020,500 @@ def seed_demo_endpoint() -> Dict[str, Any]:
     from apihub.seed import seed_demo_workspace
 
     return seed_demo_workspace()
+
+
+# ===========================================================================
+# APIHub-Pro v3.0 Enterprise Platform Routes
+# ===========================================================================
+from apihub.ai_gateway import PromptFilterEngine, ai_gateway
+from apihub.ddd_cqrs import Query as CQRSQuery, event_store, query_bus
+from apihub.dx import dx_engine
+from apihub.monetization import monetization_engine
+from apihub.observability import prometheus_exporter, trace_collector
+from apihub.resilience import resilience_engine
+from apihub.threat_security import threat_security_engine
+
+
+class AIChatCompletionRequest(BaseModel):
+    project_id: str
+    provider: str = Field(..., description="openai, azure_openai, claude, gemini, or deepseek")
+    model: str = Field(default="gpt-4o")
+    messages: List[Dict[str, str]]
+    redact_pii: bool = True
+    block_injections: bool = True
+    max_tokens: int = 512
+    temperature: float = 0.2
+
+
+class AIPromptFilterRequest(BaseModel):
+    text: str
+    redact_pii: bool = True
+    block_injections: bool = True
+
+
+class StripeCheckoutRequest(BaseModel):
+    project_id: str
+    plan_tier: str = "pro"
+    success_url: str = "https://apihub-pro.local/billing/success"
+    cancel_url: str = "https://apihub-pro.local/billing/cancel"
+
+
+class MeteredUsageRequest(BaseModel):
+    project_id: str
+    metric_type: str = "api_requests"
+    quantity: int = 1000
+    unit_price_usd: float = 0.0002
+
+
+class InvoiceGenerateRequest(BaseModel):
+    project_id: str
+    plan_tier: Optional[str] = None
+    auto_pay_via_stripe: bool = True
+
+
+class CanaryCreateRequest(BaseModel):
+    project_id: str
+    name: str
+    path: str
+    method: str = "GET"
+    stable_version: str = "v1"
+    canary_version: str = "v2"
+    canary_weight_percent: int = 20
+    auto_rollback_error_pct: float = 15.0
+
+
+class CanaryRouteRequest(BaseModel):
+    headers: Dict[str, str] = Field(default_factory=dict)
+    query_params: Dict[str, Any] = Field(default_factory=dict)
+    body: Any = None
+    routing_key: Optional[str] = None
+    simulate_canary_error: bool = False
+
+
+class TrafficShadowRequest(BaseModel):
+    project_id: str
+    path: str
+    method: str = "GET"
+    primary_version: str = "v1"
+    shadow_version: str = "v2"
+    headers: Dict[str, str] = Field(default_factory=dict)
+    query_params: Dict[str, Any] = Field(default_factory=dict)
+    body: Any = None
+
+
+class ReplayCaptureRequest(BaseModel):
+    project_id: str
+    version: str = "v2"
+    method: str = "GET"
+    path: str
+    headers: Dict[str, str] = Field(default_factory=dict)
+    query_params: Dict[str, Any] = Field(default_factory=dict)
+    body: Any = None
+    original_status: int = 200
+    original_latency_ms: float = 5.0
+
+
+class CircuitBreakerConfigRequest(BaseModel):
+    service_name: str
+    failure_threshold: int = 3
+    recovery_timeout_seconds: int = 30
+    half_open_max_calls: int = 2
+
+
+class CircuitBreakerRecordRequest(BaseModel):
+    call_succeeded: Optional[bool] = None
+    now_override: Optional[float] = None
+
+
+class ServiceRegisterRequest(BaseModel):
+    service_name: str
+    instance_url: str
+    version: str = "v1"
+    weight: int = 100
+    avg_latency_ms: float = 5.0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class RiskEvaluateRequest(BaseModel):
+    client_ip: str = "127.0.0.1"
+    path: str = "/gateway/v2/fx/quotes"
+    method: str = "GET"
+    user_agent: str = "Mozilla/5.0"
+    accept_language: str = "en-US"
+    sec_ch_ua: str = ""
+    known_fingerprint: Optional[str] = None
+
+
+class JWTIssueRequest(BaseModel):
+    subject: str
+    claims: Dict[str, Any] = Field(default_factory=dict)
+    ttl_seconds: int = 3600
+
+
+class JWTVerifyRequest(BaseModel):
+    token: str
+
+
+class SDKGenerateRequest(BaseModel):
+    endpoint_path: str
+    method: str = "GET"
+    version: str = "v2"
+    language: str = "python"
+    base_url: str = "http://localhost:8000"
+
+
+class WebhookSimulateRequest(BaseModel):
+    event_type: str = "endpoint.invoked"
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    secret: str = "whsec_simulator_secret"
+    tamper_payload: bool = False
+
+
+class GraphQLFederationRequest(BaseModel):
+    query: str
+    variables: Optional[Dict[str, Any]] = None
+
+
+# --- 1. AI Gateway Endpoints ---
+@app.get("/api/v3/ai/models", tags=["v3-ai-gateway"])
+def list_ai_gateway_models() -> Dict[str, Any]:
+    models = ai_gateway.list_supported_models()
+    return {"count": len(models), "models": models}
+
+
+@app.post("/api/v3/ai/chat/completions", tags=["v3-ai-gateway"])
+def ai_gateway_chat_completions(req: AIChatCompletionRequest) -> Response:
+    try:
+        result = ai_gateway.chat_completion(
+            project_id=req.project_id,
+            provider=req.provider,
+            model=req.model,
+            messages=req.messages,
+            redact_pii=req.redact_pii,
+            block_injections=req.block_injections,
+            max_tokens=req.max_tokens,
+            temperature=req.temperature,
+        )
+        status = 400 if result.get("status") == "blocked" else 200
+        return JSONResponse(status_code=status, content=result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v3/ai/filter-check", tags=["v3-ai-gateway"])
+def ai_prompt_filter_check(req: AIPromptFilterRequest) -> Dict[str, Any]:
+    return PromptFilterEngine.inspect_and_sanitize(
+        text=req.text,
+        redact_pii=req.redact_pii,
+        block_injections=req.block_injections,
+    )
+
+
+@app.get("/api/v3/ai/analytics", tags=["v3-ai-gateway"])
+def get_ai_gateway_analytics(project_id: Optional[str] = None) -> Dict[str, Any]:
+    return ai_gateway.get_token_and_cost_analytics(project_id=project_id)
+
+
+# --- 2. Enterprise API Monetization & Stripe Billing Endpoints ---
+@app.get("/api/v3/billing/tiers", tags=["v3-monetization"])
+def list_monetization_tiers() -> Dict[str, Any]:
+    tiers = monetization_engine.list_tiers()
+    return {"count": len(tiers), "tiers": tiers}
+
+
+@app.post("/api/v3/billing/stripe/checkout-session", status_code=201, tags=["v3-monetization"])
+def create_stripe_checkout(req: StripeCheckoutRequest) -> Dict[str, Any]:
+    try:
+        return monetization_engine.create_stripe_checkout_session(
+            project_id=req.project_id,
+            plan_tier=req.plan_tier,
+            success_url=req.success_url,
+            cancel_url=req.cancel_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v3/billing/stripe/webhook", tags=["v3-monetization"])
+async def handle_stripe_webhook(
+    request: Request,
+    stripe_signature: Optional[str] = Header(default=None, alias="Stripe-Signature"),
+) -> Dict[str, Any]:
+    raw_bytes = await request.body()
+    payload_str = raw_bytes.decode("utf-8", errors="ignore")
+    if not stripe_signature or not monetization_engine.verify_stripe_webhook(
+        payload_str, stripe_signature
+    ):
+        raise HTTPException(status_code=400, detail="Invalid Stripe-Signature header")
+    body = json.loads(payload_str or "{}")
+    event_type = body.get("type", "invoice.paid")
+    return {"received": True, "event_type": event_type, "verified": True}
+
+
+@app.post("/api/v3/billing/usage", status_code=201, tags=["v3-monetization"])
+def record_billing_usage(req: MeteredUsageRequest) -> Dict[str, Any]:
+    return monetization_engine.record_metered_usage(
+        project_id=req.project_id,
+        metric_type=req.metric_type,
+        quantity=req.quantity,
+        unit_price_usd=req.unit_price_usd,
+    )
+
+
+@app.post("/api/v3/billing/invoices/generate", status_code=201, tags=["v3-monetization"])
+def generate_project_invoice(req: InvoiceGenerateRequest) -> Dict[str, Any]:
+    return monetization_engine.generate_invoice(
+        project_id=req.project_id,
+        plan_tier=req.plan_tier,
+        auto_pay_via_stripe=req.auto_pay_via_stripe,
+    )
+
+
+@app.get("/api/v3/billing/invoices", tags=["v3-monetization"])
+def list_project_invoices(project_id: Optional[str] = None) -> Dict[str, Any]:
+    items = monetization_engine.list_invoices(project_id=project_id)
+    return {"count": len(items), "invoices": items}
+
+
+@app.get("/api/v3/billing/revenue", tags=["v3-monetization"])
+def get_executive_revenue_analytics() -> Dict[str, Any]:
+    return monetization_engine.get_revenue_analytics()
+
+
+# --- 3. Advanced Gateway Resilience (Canary, Shadowing, Replay, Circuit Breakers, Discovery) ---
+@app.post("/api/v3/gateway/canary", status_code=201, tags=["v3-resilience"])
+def create_canary(req: CanaryCreateRequest) -> Dict[str, Any]:
+    try:
+        return resilience_engine.create_canary_deployment(
+            project_id=req.project_id,
+            name=req.name,
+            path=req.path,
+            method=req.method,
+            stable_version=req.stable_version,
+            canary_version=req.canary_version,
+            canary_weight_percent=req.canary_weight_percent,
+            auto_rollback_error_pct=req.auto_rollback_error_pct,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/v3/gateway/canary", tags=["v3-resilience"])
+def list_canaries(project_id: Optional[str] = None) -> Dict[str, Any]:
+    items = resilience_engine.list_canary_deployments(project_id=project_id)
+    return {"count": len(items), "canary_deployments": items}
+
+
+@app.post("/api/v3/gateway/canary/{canary_id}/route", tags=["v3-resilience"])
+def route_canary_call(canary_id: str, req: CanaryRouteRequest) -> Dict[str, Any]:
+    try:
+        return resilience_engine.route_canary_request(
+            canary_id=canary_id,
+            headers=req.headers,
+            query_params=req.query_params,
+            body=req.body,
+            routing_key=req.routing_key,
+            simulate_canary_error=req.simulate_canary_error,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/v3/gateway/shadow", tags=["v3-resilience"])
+def execute_traffic_shadowing(req: TrafficShadowRequest) -> Dict[str, Any]:
+    return resilience_engine.execute_shadow_traffic(
+        project_id=req.project_id,
+        path=req.path,
+        method=req.method,
+        primary_version=req.primary_version,
+        shadow_version=req.shadow_version,
+        headers=req.headers,
+        query_params=req.query_params,
+        body=req.body,
+    )
+
+
+@app.post("/api/v3/gateway/replay/capture", status_code=201, tags=["v3-resilience"])
+def capture_request_for_replay(req: ReplayCaptureRequest) -> Dict[str, Any]:
+    return resilience_engine.capture_request_for_replay(
+        project_id=req.project_id,
+        version=req.version,
+        method=req.method,
+        path=req.path,
+        headers=req.headers,
+        query_params=req.query_params,
+        body=req.body,
+        original_status=req.original_status,
+        original_latency_ms=req.original_latency_ms,
+    )
+
+
+@app.post("/api/v3/gateway/replay/{capture_id}/execute", tags=["v3-resilience"])
+def execute_replayed_request(
+    capture_id: str, target_version_override: Optional[str] = None
+) -> Dict[str, Any]:
+    try:
+        return resilience_engine.execute_request_replay(
+            capture_id=capture_id,
+            target_version_override=target_version_override,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/v3/gateway/circuit-breakers", status_code=201, tags=["v3-resilience"])
+def configure_circuit_breaker(req: CircuitBreakerConfigRequest) -> Dict[str, Any]:
+    return resilience_engine.configure_circuit_breaker(
+        service_name=req.service_name,
+        failure_threshold=req.failure_threshold,
+        recovery_timeout_seconds=req.recovery_timeout_seconds,
+        half_open_max_calls=req.half_open_max_calls,
+    )
+
+
+@app.post("/api/v3/gateway/circuit-breakers/{service_name}/record", tags=["v3-resilience"])
+def record_circuit_breaker_call(
+    service_name: str, req: CircuitBreakerRecordRequest
+) -> Dict[str, Any]:
+    return resilience_engine.check_and_record_circuit_breaker(
+        service_name=service_name,
+        call_succeeded=req.call_succeeded,
+        now_override=req.now_override,
+    )
+
+
+@app.post("/api/v3/gateway/discovery/register", status_code=201, tags=["v3-resilience"])
+def register_service_discovery_instance(req: ServiceRegisterRequest) -> Dict[str, Any]:
+    return resilience_engine.register_service_instance(
+        service_name=req.service_name,
+        instance_url=req.instance_url,
+        version=req.version,
+        weight=req.weight,
+        avg_latency_ms=req.avg_latency_ms,
+        metadata=req.metadata,
+    )
+
+
+@app.get("/api/v3/gateway/discovery/services", tags=["v3-resilience"])
+def list_discovered_services(service_name: Optional[str] = None) -> Dict[str, Any]:
+    items = resilience_engine.list_services(service_name=service_name)
+    return {"count": len(items), "services": items}
+
+
+@app.post("/api/v3/gateway/discovery/resolve/{service_name}", tags=["v3-resilience"])
+def resolve_service_instance(
+    service_name: str, strategy: str = "least_latency"
+) -> Dict[str, Any]:
+    try:
+        return resilience_engine.resolve_service_instance(
+            service_name=service_name, strategy=strategy
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# --- 4. Advanced Security (Device Fingerprinting, Risk Scoring, Threat Intel, JWT Rotation & JWKS) ---
+@app.post("/api/v3/security/evaluate-request", tags=["v3-security"])
+def evaluate_request_threat_risk(req: RiskEvaluateRequest) -> Dict[str, Any]:
+    return threat_security_engine.evaluate_request_risk(
+        client_ip=req.client_ip,
+        path=req.path,
+        method=req.method,
+        user_agent=req.user_agent,
+        accept_language=req.accept_language,
+        sec_ch_ua=req.sec_ch_ua,
+        known_fingerprint=req.known_fingerprint,
+    )
+
+
+@app.get("/api/v3/security/threat-events", tags=["v3-security"])
+def list_threat_intel_events(limit: int = 50) -> Dict[str, Any]:
+    events = threat_security_engine.list_threat_events(limit=limit)
+    return {"count": len(events), "events": events}
+
+
+@app.get("/.well-known/jwks.json", tags=["v3-security"])
+def get_jwks_keystore() -> Dict[str, Any]:
+    return threat_security_engine.get_jwks()
+
+
+@app.post("/api/v3/security/jwt/rotate", tags=["v3-security"])
+def rotate_jwt_key(grace_period_seconds: int = 86400) -> Dict[str, Any]:
+    return threat_security_engine.rotate_jwt_signing_key(
+        grace_period_seconds=grace_period_seconds
+    )
+
+
+@app.post("/api/v3/security/jwt/issue", tags=["v3-security"])
+def issue_jwt_token(req: JWTIssueRequest) -> Dict[str, Any]:
+    return threat_security_engine.issue_jwt(
+        subject=req.subject,
+        claims=req.claims,
+        ttl_seconds=req.ttl_seconds,
+    )
+
+
+@app.post("/api/v3/security/jwt/verify", tags=["v3-security"])
+def verify_jwt_token(req: JWTVerifyRequest) -> Dict[str, Any]:
+    return threat_security_engine.verify_jwt(req.token)
+
+
+# --- 5. Observability (Prometheus Metrics & OpenTelemetry Distributed Traces) ---
+@app.get("/metrics", response_class=PlainTextResponse, tags=["v3-observability"])
+def get_prometheus_metrics() -> Response:
+    content = prometheus_exporter.render_metrics()
+    return PlainTextResponse(
+        content=content, media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+@app.get("/api/v3/observability/traces", tags=["v3-observability"])
+def list_distributed_traces(limit: int = 50) -> Dict[str, Any]:
+    traces = trace_collector.list_traces(limit=limit)
+    return {"count": len(traces), "traces": traces}
+
+
+@app.get("/api/v3/observability/traces/{trace_id}", tags=["v3-observability"])
+def get_distributed_trace(trace_id: str) -> Dict[str, Any]:
+    t = trace_collector.get_trace(trace_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Trace not found")
+    return t
+
+
+# --- 6. Developer Experience (SDK Generator, Webhook Simulator, GraphQL Federation v2) ---
+@app.post("/api/v3/dx/sdk-generate", tags=["v3-dx"])
+def generate_client_sdk(req: SDKGenerateRequest) -> Dict[str, Any]:
+    return dx_engine.generate_sdk(
+        endpoint_path=req.endpoint_path,
+        method=req.method,
+        version=req.version,
+        language=req.language,
+        base_url=req.base_url,
+    )
+
+
+@app.post("/api/v3/dx/webhook-simulate", tags=["v3-dx"])
+def simulate_webhook_delivery(req: WebhookSimulateRequest) -> Dict[str, Any]:
+    return dx_engine.simulate_webhook(
+        event_type=req.event_type,
+        payload=req.payload,
+        secret=req.secret,
+        tamper_payload=req.tamper_payload,
+    )
+
+
+@app.post("/api/v3/graphql", tags=["v3-dx"])
+def graphql_federation_gateway(req: GraphQLFederationRequest) -> Dict[str, Any]:
+    return dx_engine.execute_graphql_query(query=req.query, variables=req.variables)
+
+
+# --- 7. DDD Event Sourcing & CQRS Endpoints ---
+@app.get("/api/v3/architecture/events", tags=["v3-ddd-cqrs"])
+def get_domain_event_stream(limit: int = 50) -> Dict[str, Any]:
+    return query_bus.ask(CQRSQuery(name="domain.events_summary", params={"limit": limit}))
+
+
+@app.get("/api/v3/architecture/replay/{aggregate_id}", tags=["v3-ddd-cqrs"])
+def replay_aggregate_domain_events(aggregate_id: str) -> Dict[str, Any]:
+    return event_store.replay_aggregate_state(aggregate_id)

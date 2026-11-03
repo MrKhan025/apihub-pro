@@ -245,6 +245,143 @@ CREATE INDEX IF NOT EXISTS idx_request_metrics_created_at ON request_metrics(cre
 CREATE INDEX IF NOT EXISTS idx_request_metrics_project ON request_metrics(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS domain_events (
+    id TEXT PRIMARY KEY,
+    aggregate_type TEXT NOT NULL,
+    aggregate_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    sequence_num INTEGER NOT NULL DEFAULT 1,
+    payload TEXT NOT NULL DEFAULT '{}',
+    metadata TEXT NOT NULL DEFAULT '{}',
+    event_hash TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_gateway_logs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0.0,
+    latency_ms REAL NOT NULL DEFAULT 0.0,
+    filter_action TEXT NOT NULL DEFAULT 'allowed',
+    pii_redacted INTEGER NOT NULL DEFAULT 0,
+    prompt_excerpt TEXT DEFAULT '',
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS billing_usage_records (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    metric_type TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price_usd REAL NOT NULL DEFAULT 0.0,
+    total_usd REAL NOT NULL DEFAULT 0.0,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS billing_invoices (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    plan_tier TEXT NOT NULL,
+    base_fee_usd REAL NOT NULL DEFAULT 0.0,
+    metered_usage_usd REAL NOT NULL DEFAULT 0.0,
+    ai_usage_usd REAL NOT NULL DEFAULT 0.0,
+    tax_usd REAL NOT NULL DEFAULT 0.0,
+    total_usd REAL NOT NULL DEFAULT 0.0,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    status TEXT NOT NULL DEFAULT 'open',
+    stripe_invoice_id TEXT,
+    stripe_checkout_url TEXT,
+    line_items TEXT NOT NULL DEFAULT '[]',
+    period_start REAL NOT NULL,
+    period_end REAL NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS canary_deployments (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT 'GET',
+    stable_version TEXT NOT NULL DEFAULT 'v1',
+    canary_version TEXT NOT NULL DEFAULT 'v2',
+    canary_weight_percent INTEGER NOT NULL DEFAULT 20,
+    auto_rollback_error_pct REAL NOT NULL DEFAULT 10.0,
+    total_stable_requests INTEGER NOT NULL DEFAULT 0,
+    total_canary_requests INTEGER NOT NULL DEFAULT 0,
+    canary_errors INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS circuit_breakers (
+    service_name TEXT PRIMARY KEY,
+    state TEXT NOT NULL DEFAULT 'CLOSED',
+    failure_count INTEGER NOT NULL DEFAULT 0,
+    success_count INTEGER NOT NULL DEFAULT 0,
+    failure_threshold INTEGER NOT NULL DEFAULT 3,
+    recovery_timeout_seconds INTEGER NOT NULL DEFAULT 30,
+    half_open_max_calls INTEGER NOT NULL DEFAULT 2,
+    last_failure_at REAL DEFAULT 0,
+    updated_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_registry (
+    id TEXT PRIMARY KEY,
+    service_name TEXT NOT NULL,
+    instance_url TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT 'v1',
+    weight INTEGER NOT NULL DEFAULT 100,
+    status TEXT NOT NULL DEFAULT 'healthy',
+    avg_latency_ms REAL NOT NULL DEFAULT 5.0,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    last_heartbeat_at REAL NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS replay_vault (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    version TEXT NOT NULL,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    headers TEXT NOT NULL DEFAULT '{}',
+    query_params TEXT NOT NULL DEFAULT '{}',
+    body TEXT NOT NULL DEFAULT '{}',
+    original_status INTEGER NOT NULL DEFAULT 200,
+    original_latency_ms REAL NOT NULL DEFAULT 0.0,
+    replay_count INTEGER NOT NULL DEFAULT 0,
+    last_replay_status INTEGER,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS threat_intel_events (
+    id TEXT PRIMARY KEY,
+    client_ip TEXT NOT NULL,
+    device_fingerprint TEXT NOT NULL,
+    risk_score INTEGER NOT NULL,
+    risk_level TEXT NOT NULL,
+    action_taken TEXT NOT NULL,
+    reasons TEXT NOT NULL DEFAULT '[]',
+    path TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS jwt_signing_keys (
+    kid TEXT PRIMARY KEY,
+    algorithm TEXT NOT NULL DEFAULT 'HS256',
+    secret_material TEXT NOT NULL,
+    public_jwk TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at REAL NOT NULL,
+    expires_at REAL
+);
 """
 
 
@@ -368,6 +505,16 @@ class DatabaseManager:
         """Reset all tables for isolated unit/integration test runs."""
         with self.connection() as conn:
             for table in [
+                "domain_events",
+                "ai_gateway_logs",
+                "billing_usage_records",
+                "billing_invoices",
+                "canary_deployments",
+                "circuit_breakers",
+                "service_registry",
+                "replay_vault",
+                "threat_intel_events",
+                "jwt_signing_keys",
                 "webhook_deliveries",
                 "webhooks",
                 "request_metrics",
