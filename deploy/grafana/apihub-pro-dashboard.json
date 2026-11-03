@@ -1,1 +1,52 @@
-
+{
+  "title": "APIHub-Pro v3.0 Enterprise Gateway & AI Telemetry",
+  "uid": "apihub-pro-v3",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Gateway HTTP Requests by Status Class",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(apihub_http_requests_total[1m])"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Gateway Latency Percentiles (p50 / p90 / p95 / p99)",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "apihub_http_latency_milliseconds"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "AI Gateway Token Throughput & Cumulative Cost (USD)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "apihub_ai_tokens_total"
+        },
+        {
+          "expr": "apihub_ai_cost_usd_total"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Circuit Breaker State (0=CLOSED, 1=HALF_OPEN, 2=OPEN)",
+      "type": "state-timeline",
+      "targets": [
+        {
+          "expr": "apihub_circuit_breaker_state"
+        }
+      ]
+    }
+  ]
+}
