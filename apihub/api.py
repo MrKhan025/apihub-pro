@@ -116,7 +116,9 @@ class SecurityAndAbuseMiddleware:
             if not body_sent:
                 body_sent = True
                 return {"type": "http.request", "body": raw_body, "more_body": False}
-            return {"type": "http.disconnect"}
+            # Delegate subsequent receive() polls (e.g., Starlette >=0.28 listen_for_disconnect)
+            # to the underlying ASGI receive channel so active requests are never prematurely cancelled.
+            return await receive()
 
         from apihub.observability import trace_collector
         req_headers_dict = {

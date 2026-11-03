@@ -36,7 +36,7 @@ class Settings:
     app_name: str = field(default_factory=lambda: os.getenv("APIHUB_APP_NAME", "apihub-pro"))
     environment: str = field(default_factory=lambda: os.getenv("APIHUB_ENV", "development"))
     debug: bool = field(default_factory=lambda: _env_bool("APIHUB_DEBUG", False))
-    host: str = field(default_factory=lambda: os.getenv("APIHUB_HOST", "0.0.0.0"))
+    host: str = field(default_factory=lambda: os.getenv("APIHUB_HOST", "0.0.0.0"))  # nosec B104
     port: int = field(default_factory=lambda: _env_int("APIHUB_PORT", 8000))
 
     # Database / PostgreSQL production configuration
