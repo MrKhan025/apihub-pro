@@ -1,0 +1,8 @@
+apiVersion: v2
+name: apihub-pro
+description: Enterprise AI Gateway, Monetization, Observability & API Management Platform Helm Chart
+type: application
+version: 3.0.0
+appVersion: "3.0.0"
+maintainers:
+  - name: MrKhan025

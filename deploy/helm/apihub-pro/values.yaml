@@ -1,0 +1,31 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/mrkhan025/apihub-pro
+  pullPolicy: IfNotPresent
+  tag: "3.0.0"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+env:
+  APIHUB_ENV: "production"
+  DB_POOL_SIZE: "25"
+  REDIS_ENABLED: "true"
