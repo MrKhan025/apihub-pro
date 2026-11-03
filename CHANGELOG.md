@@ -1,19 +1,16 @@
-# Changelog — API-Hub-Pro (`apihub-pro`)
+# Changelog — APIHub-Pro (`apihub-pro`)
 
-## [2.0.0] — 2026-11-03 (Advanced API Engine Release)
+## [3.0.0] — 2026-11-03 (Enterprise AI Gateway, Monetization, Observability & Cloud-Native Platform)
 
 ### Added
-- **Dynamic API Gateway (`apihub/gateway.py`):** Runtime registration, updating, and execution of API endpoints (`/gateway/{version}/{path}`) without writing route code.
-- **API Versioning & Lifecycle Management:** Support for `draft`, `active`, `deprecated` (with automatic `Deprecation` and `Sunset` HTTP headers), and `retired` (`410 Gone`) states.
-- **Request & Response Transformation Pipeline:** Declarative header injection/removal, JSON field renaming, sensitive field masking (`***1234`), and response envelope wrapping.
-- **Configurable Request Timeouts:** Per-endpoint `timeout_ms` enforcement returning `504 Gateway Timeout` when exceeded.
-- **Webhook Management & Retry Policies (`apihub/webhooks.py`):** HMAC-SHA256 webhook payload signing (`X-APIHub-Signature-256`) and configurable `exponential`, `linear`, or `fixed` retry policies with delivery logs.
-- **Redis Distributed Rate Limiting & Caching (`apihub/rate_limiter.py`):** Sliding-window rate limiting with `X-RateLimit-*` and `Retry-After` headers plus GET response caching.
-- **Enterprise Security (`apihub/security.py`):** Role-based permissions (`admin`, `developer`, `auditor`, `viewer`), project-level access (`owner`, `editor`, `reader`), API key expiration and zero-downtime grace-period rotation, login throttling, RFC 6238 TOTP MFA, password reset tokens, request size limits (`413`), SQLi/XSS/path-traversal abuse prevention (`400`), HMAC-SHA256 hash-chained audit logs, and Automated Security Auditing.
-- **Live Operational Analytics (`apihub/analytics.py`):** Real-time RPM, daily usage, `p50`/`p90`/`p95`/`p99` latency percentiles, endpoint error rates, SVG chart generation, and CSV/JSON exportable reports.
-- **API Marketplace & Subscription Plans (`apihub/marketplace.py`):** `Free`, `Pro`, and `Enterprise` plans, marketplace API publishing, and project subscription quota upgrades.
-- **Responsive Dashboard (`web/`):** 8-tab responsive web interface for live metrics, dynamic endpoint editing, interactive API exploring, key rotation, RBAC management, marketplace browsing, webhooks, and security auditing.
-- **Infrastructure:** PostgreSQL production pool configuration, Alembic migrations (`0001_v1_baseline`, `0002_v2_advanced_engine`), Docker Compose `production` profile, GitHub Actions CI, and Termux setup script.
+- **Multi-Provider AI Gateway (`apihub/ai_gateway.py`):** Unified completions and model catalog for **OpenAI**, **Azure OpenAI**, **Anthropic Claude**, **Google Gemini**, and **DeepSeek** with real-time prompt injection/jailbreak blocking, automatic PII redaction, token analytics, and USD cost tracking.
+- **Enterprise API Monetization (`apihub/monetization.py`):** **Stripe** Checkout session creation, `Stripe-Signature` HMAC-SHA256 webhook verification, metered usage billing, tiered plans (`Free`, `Pro`, `Enterprise`, `AI Scale`), itemized invoice generation, and executive revenue analytics (**MRR, ARR, ARPU**).
+- **Advanced Gateway Resilience (`apihub/resilience.py`):** Weighted **Canary deployments** with automatic rollback on error spikes, **Traffic Shadowing** with payload diffing, **Request Replay Vault**, 3-state **Circuit Breakers** (`CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN`), and dynamic **Service Discovery** (`least_latency` / `round_robin`).
+- **Threat Intelligence & JWKS Security (`apihub/threat_security.py`):** `SHA-256` **Device Fingerprinting**, continuous `0–100` **Risk Scoring**, **Threat Intelligence & API Abuse Detection**, and **Multi-Key JWT Key Rotation & JWKS** (`/.well-known/jwks.json`).
+- **Observability (`apihub/observability.py`, `deploy/`):** Native **Prometheus** `/metrics` exporter, **OpenTelemetry** W3C `traceparent` distributed tracing, and **Grafana** dashboard JSON.
+- **Developer Experience (`apihub/dx.py`):** Multi-language **SDK Generator** (`Python`, `TypeScript`, `Go`, `cURL`), **Webhook Simulator**, and **Apollo GraphQL Federation v2** (`POST /api/v3/graphql`).
+- **DDD, Repository Pattern, Event Sourcing & CQRS (`apihub/ddd_cqrs.py`):** Immutable `DomainEvent` store, aggregate state replay, generic `BaseRepository`, `CommandBus`, and `QueryBus`.
+- **Kubernetes & Helm Support (`deploy/k8s/`, `deploy/helm/apihub-pro/`):** Production Kubernetes manifests (`Deployment`, `Service`, `Ingress`, `ConfigMap`, `PodDisruptionBudget`, `HorizontalPodAutoscaler`) and Helm v3 chart.
 
-### Preserved
-- **100% v1 Backward Compatibility:** Retained `/health`, `/api/v1/status`, `/api/v1/endpoints`, `/api/v1/projects`, and `/api/v1/keys`.
+## [2.0.0] — 2026-11-03 (Advanced API Engine Release)
+- Dynamic API endpoint registration, versioning, lifecycle management, request/response transforms, configurable timeouts, webhooks with retries, Redis rate limiting, RBAC, TOTP MFA, API key rotation, percentile analytics, and API marketplace.
