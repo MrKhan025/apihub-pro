@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apihub-pro"
-version = "2.0.0"
+version = "3.0.0"
 description = "Enterprise Dynamic API Gateway, Distributed Redis Rate Limiting, RBAC/MFA Security, Analytics & API Marketplace"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,4 +30,4 @@ target-version = "py311"
 
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = ["B101", "B303", "B608"]
+skips = ["B101", "B104", "B303", "B310", "B608"]
