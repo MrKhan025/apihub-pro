@@ -180,6 +180,40 @@ async function refreshAll() {
     )
     .join("");
 
+
+  // v3.0 AI Gateway, Monetization, Observability & SDK Generator bindings
+  const aiStatsRes = await apiFetch("/api/v3/ai/analytics");
+  if (aiStatsRes.body && document.getElementById("kpiAiTokens")) {
+    document.getElementById("kpiAiTokens").textContent = `${aiStatsRes.body.tokens?.total_tokens ?? 0} tok`;
+    document.getElementById("kpiAiCost").textContent = `Cost: $${aiStatsRes.body.total_cost_usd ?? 0} USD (${aiStatsRes.body.total_requests ?? 0} calls)`;
+  }
+
+  const [revRes, invRes, svcRes, trcRes] = await Promise.all([
+    apiFetch("/api/v3/billing/revenue"),
+    apiFetch("/api/v3/billing/invoices"),
+    apiFetch("/api/v3/gateway/discovery/services"),
+    apiFetch("/api/v3/observability/traces?limit=10"),
+  ]);
+
+  if (document.getElementById("revenueOutput") && revRes.body) {
+    document.getElementById("revenueOutput").textContent = JSON.stringify(revRes.body, null, 2);
+  }
+  if (document.querySelector("#invoicesTable tbody") && invRes.body) {
+    document.querySelector("#invoicesTable tbody").innerHTML = (invRes.body.invoices || [])
+      .map((i) => `<tr><td><code>${i.id}</code></td><td>${i.plan_tier.toUpperCase()}</td><td>$${i.total_usd}</td><td>${i.status}</td></tr>`)
+      .join("");
+  }
+  if (document.querySelector("#servicesTable tbody") && svcRes.body) {
+    document.querySelector("#servicesTable tbody").innerHTML = (svcRes.body.services || [])
+      .map((s) => `<tr><td><strong>${s.service_name}</strong></td><td><code>${s.instance_url}</code></td><td>${s.avg_latency_ms}ms</td><td>${s.status}</td></tr>`)
+      .join("");
+  }
+  if (document.querySelector("#tracesTable tbody") && trcRes.body) {
+    document.querySelector("#tracesTable tbody").innerHTML = (trcRes.body.traces || [])
+      .map((t) => `<tr><td><code>${t.trace_id.slice(0, 12)}...</code></td><td>${t.name}</td><td>${t.status_code}</td><td>${t.duration_ms}ms</td></tr>`)
+      .join("");
+  }
+
   // Render Audit Logs
   document.querySelector("#auditLogsTable tbody").innerHTML = (auditRes.body?.audit_logs || [])
     .map(
@@ -291,6 +325,75 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
     await refreshAll();
   });
+
+
+  const aiForm = document.getElementById("aiCompletionForm");
+  if (aiForm) {
+    aiForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await apiFetch("/api/v3/ai/chat/completions", {
+        method: "POST",
+        body: JSON.stringify({
+          project_id: state.defaultProjectId || "prj_default",
+          provider: document.getElementById("aiProvider").value,
+          model: document.getElementById("aiModel").value,
+          messages: [{ role: "user", content: document.getElementById("aiPrompt").value }],
+          redact_pii: true,
+          block_injections: true,
+        }),
+      });
+      document.getElementById("aiGatewayOutput").textContent = JSON.stringify(res.body, null, 2);
+      await refreshAll();
+    });
+  }
+
+  const invBtn = document.getElementById("generateInvoiceBtn");
+  if (invBtn) {
+    invBtn.addEventListener("click", async () => {
+      await apiFetch("/api/v3/billing/invoices/generate", {
+        method: "POST",
+        body: JSON.stringify({ project_id: state.defaultProjectId, plan_tier: "pro" }),
+      });
+      await refreshAll();
+    });
+  }
+
+  const svcForm = document.getElementById("registerServiceForm");
+  if (svcForm) {
+    svcForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await apiFetch("/api/v3/gateway/discovery/register", {
+        method: "POST",
+        body: JSON.stringify({
+          service_name: document.getElementById("svcName").value,
+          instance_url: document.getElementById("svcUrl").value,
+        }),
+      });
+      await refreshAll();
+    });
+  }
+
+  const pySdkBtn = document.getElementById("genPythonSdkBtn");
+  if (pySdkBtn) {
+    pySdkBtn.addEventListener("click", async () => {
+      const res = await apiFetch("/api/v3/dx/sdk-generate", {
+        method: "POST",
+        body: JSON.stringify({ endpoint_path: "/fx/quotes", method: "GET", version: "v2", language: "python" }),
+      });
+      document.getElementById("explorerOutput").textContent = res.body.sdk_code;
+    });
+  }
+
+  const tsSdkBtn = document.getElementById("genTsSdkBtn");
+  if (tsSdkBtn) {
+    tsSdkBtn.addEventListener("click", async () => {
+      const res = await apiFetch("/api/v3/dx/sdk-generate", {
+        method: "POST",
+        body: JSON.stringify({ endpoint_path: "/fx/quotes", method: "GET", version: "v2", language: "typescript" }),
+      });
+      document.getElementById("explorerOutput").textContent = res.body.sdk_code;
+    });
+  }
 
   document.getElementById("runSecurityAuditBtn").addEventListener("click", async () => {
     const res = await apiFetch("/api/v2/security/automated-audit", { method: "POST" });

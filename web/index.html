@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API-Hub-Pro v2.0 — Enterprise Gateway, Analytics &amp; Marketplace</title>
+  <title>APIHub-Pro v3.0 — Enterprise AI Gateway, Monetization &amp; API Platform</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
@@ -13,39 +13,42 @@
         <div class="brand-badge">AHP</div>
         <div>
           <h1>apihub-pro</h1>
-          <span class="version-pill">v2.0 Advanced Engine</span>
+          <span class="version-pill">v3.0 Enterprise</span>
         </div>
       </div>
       <nav class="nav-links">
-        <button class="nav-btn active" data-tab="overview">Live Metrics &amp; Analytics</button>
-        <button class="nav-btn" data-tab="gateway">Dynamic Gateway &amp; Editor</button>
-        <button class="nav-btn" data-tab="explorer">Interactive API Explorer</button>
-        <button class="nav-btn" data-tab="keys">API Keys &amp; Rotation</button>
+        <button class="nav-btn active" data-tab="overview">Live Metrics &amp; Observability</button>
+        <button class="nav-btn" data-tab="aigateway">AI Gateway (Multi-LLM)</button>
+        <button class="nav-btn" data-tab="monetization">Stripe &amp; Monetization</button>
+        <button class="nav-btn" data-tab="resilience">Canary &amp; Circuit Breakers</button>
+        <button class="nav-btn" data-tab="gateway">Dynamic Gateway Editor</button>
+        <button class="nav-btn" data-tab="explorer">API Explorer &amp; SDK Gen</button>
+        <button class="nav-btn" data-tab="keys">API Keys &amp; JWKS Rotation</button>
         <button class="nav-btn" data-tab="projects">Projects &amp; RBAC Users</button>
         <button class="nav-btn" data-tab="marketplace">API Marketplace &amp; Plans</button>
-        <button class="nav-btn" data-tab="webhooks">Webhooks &amp; Retries</button>
-        <button class="nav-btn" data-tab="security">Security Audit &amp; MFA</button>
+        <button class="nav-btn" data-tab="webhooks">Webhooks &amp; Simulator</button>
+        <button class="nav-btn" data-tab="security">Zero-Trust &amp; Threat Intel</button>
       </nav>
       <div class="sidebar-footer">
         <button id="seedDemoBtn" class="btn btn-secondary full-width">Load Demo Workspace</button>
-        <div id="infraBadge" class="infra-status">Redis &amp; DB Ready</div>
+        <div id="infraBadge" class="infra-status">PostgreSQL · Redis · OTel Ready</div>
       </div>
     </aside>
 
     <main class="content">
       <header class="topbar">
         <div>
-          <h2 id="pageTitle">Live Operational Metrics &amp; Analytics</h2>
-          <p class="subtitle">Dynamic API Gateway · Distributed Rate Limiting · Zero-Trust Security · Marketplace</p>
+          <h2 id="pageTitle">Live Operational Metrics &amp; Observability</h2>
+          <p class="subtitle">AI Gateway · Stripe Billing · Canary Traffic · OpenTelemetry · Zero-Trust Security</p>
         </div>
         <div class="topbar-actions">
+          <a href="/metrics" class="btn btn-outline" target="_blank">Prometheus /metrics</a>
           <a href="/api/v2/analytics/export?format=csv" class="btn btn-outline" target="_blank">Export CSV</a>
-          <a href="/api/v2/analytics/export?format=json" class="btn btn-outline" target="_blank">Export JSON</a>
-          <button id="refreshAllBtn" class="btn btn-primary">Refresh Live Data</button>
+          <button id="refreshAllBtn" class="btn btn-primary">Refresh Telemetry</button>
         </div>
       </header>
 
-      <!-- TAB 1: LIVE METRICS & ANALYTICS -->
+      <!-- TAB 1: LIVE METRICS & OBSERVABILITY -->
       <section id="tab-overview" class="tab-panel active">
         <div class="kpi-grid">
           <div class="kpi-card">
@@ -59,12 +62,12 @@
             <span id="kpiAvgLat" class="kpi-sub">Avg: 0 ms</span>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">Gateway Error Rate</span>
-            <strong id="kpiErrorRate" class="kpi-value">0.0%</strong>
-            <span id="kpiStatusBreakdown" class="kpi-sub">2xx: 0 | 4xx: 0 | 5xx: 0</span>
+            <span class="kpi-label">AI Gateway Tokens &amp; Spend</span>
+            <strong id="kpiAiTokens" class="kpi-value">0 tok</strong>
+            <span id="kpiAiCost" class="kpi-sub">Cost: $0.0000 USD</span>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">Security &amp; Audit Score</span>
+            <span class="kpi-label">Platform MRR / Security Score</span>
             <strong id="kpiSecurityScore" class="kpi-value">100/100</strong>
             <span id="kpiAuditStatus" class="kpi-sub">HMAC Chain Verified</span>
           </div>
@@ -95,7 +98,110 @@
         </div>
       </section>
 
-      <!-- TAB 2: DYNAMIC GATEWAY & ENDPOINT EDITOR -->
+      <!-- TAB 2: AI GATEWAY -->
+      <section id="tab-aigateway" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Multi-Provider AI Gateway Playground</h3>
+            <form id="aiCompletionForm" class="form-stack">
+              <div class="form-row">
+                <label>AI Provider
+                  <select id="aiProvider">
+                    <option value="openai">OpenAI</option>
+                    <option value="azure_openai">Azure OpenAI</option>
+                    <option value="claude">Anthropic Claude</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="deepseek">DeepSeek</option>
+                  </select>
+                </label>
+                <label>Model Name <input type="text" id="aiModel" value="gpt-4o" required /></label>
+              </div>
+              <label>Prompt Message (Tested against PII Redaction &amp; Injection Guard)
+                <textarea id="aiPrompt" rows="3">Summarize gateway latency for customer SSN 123-45-6789.</textarea>
+              </label>
+              <button type="submit" class="btn btn-primary">Execute AI Completion</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>AI Gateway Response, Token Usage &amp; Cost</h3>
+            <pre id="aiGatewayOutput" class="code-box">Submit a prompt to test OpenAI, Azure OpenAI, Claude, Gemini, or DeepSeek routing with PII redaction and cost tracking.</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: STRIPE & MONETIZATION -->
+      <section id="tab-monetization" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Enterprise Revenue &amp; Invoice Generator</h3>
+            <button id="generateInvoiceBtn" class="btn btn-primary">Generate Stripe Invoice for Active Project</button>
+            <pre id="revenueOutput" class="code-box">Loading revenue telemetry...</pre>
+          </div>
+          <div class="card">
+            <h3>Generated Project Invoices</h3>
+            <div class="table-wrap">
+              <table id="invoicesTable">
+                <thead>
+                  <tr>
+                    <th>Invoice ID</th>
+                    <th>Tier</th>
+                    <th>Total (USD)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: CANARY & CIRCUIT BREAKERS -->
+      <section id="tab-resilience" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Service Discovery &amp; Circuit Breakers</h3>
+            <form id="registerServiceForm" class="form-stack">
+              <div class="form-row">
+                <label>Service Name <input type="text" id="svcName" value="payment-core" required /></label>
+                <label>Instance URL <input type="text" id="svcUrl" value="http://10.0.1.25:8080" required /></label>
+              </div>
+              <button type="submit" class="btn btn-primary">Register Service Instance</button>
+            </form>
+            <div class="table-wrap" style="margin-top:1rem;">
+              <table id="servicesTable">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Instance URL</th>
+                    <th>Latency</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Distributed OpenTelemetry Traces</h3>
+            <div class="table-wrap">
+              <table id="tracesTable">
+                <thead>
+                  <tr>
+                    <th>Trace ID</th>
+                    <th>Operation</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: DYNAMIC GATEWAY EDITOR -->
       <section id="tab-gateway" class="tab-panel">
         <div class="grid-2">
           <div class="card">
@@ -156,11 +262,11 @@
         </div>
       </section>
 
-      <!-- TAB 3: INTERACTIVE API EXPLORER -->
+      <!-- TAB 6: INTERACTIVE API EXPLORER & SDK GENERATOR -->
       <section id="tab-explorer" class="tab-panel">
         <div class="grid-2">
           <div class="card">
-            <h3>Gateway Request Builder</h3>
+            <h3>Gateway Request Builder &amp; Client SDK Generator</h3>
             <form id="apiExplorerForm" class="form-stack">
               <div class="form-row">
                 <label>Method
@@ -175,23 +281,27 @@
                 <input type="text" id="expApiKey" placeholder="ahp_live_..." />
               </label>
               <label>Request JSON Body (for POST/PUT)
-                <textarea id="expBody" rows="4">{"amt": 250.00, "customer": "MrKhan"}</textarea>
+                <textarea id="expBody" rows="3">{"amt": 250.00, "customer": "MrKhan"}</textarea>
               </label>
-              <button type="submit" class="btn btn-primary">Send Gateway Request</button>
+              <div class="form-row">
+                <button type="submit" class="btn btn-primary">Send Gateway Request</button>
+                <button type="button" id="genPythonSdkBtn" class="btn btn-outline">Generate Python SDK</button>
+                <button type="button" id="genTsSdkBtn" class="btn btn-outline">Generate TypeScript SDK</button>
+              </div>
             </form>
           </div>
           <div class="card">
-            <h3>Live Gateway Response &amp; Rate-Limit Headers</h3>
-            <pre id="explorerOutput" class="code-box">Click "Send Gateway Request" to inspect status, X-RateLimit-* headers, and transformed response payload.</pre>
+            <h3>Live Gateway Response / Generated SDK Code</h3>
+            <pre id="explorerOutput" class="code-box">Click "Send Gateway Request" or "Generate SDK" to inspect live output.</pre>
           </div>
         </div>
       </section>
 
-      <!-- TAB 4: API KEYS & GRACE-PERIOD ROTATION -->
+      <!-- TAB 7: API KEYS & JWKS ROTATION -->
       <section id="tab-keys" class="tab-panel">
         <div class="grid-2">
           <div class="card">
-            <h3>Issue Scoped API Key</h3>
+            <h3>Issue Scoped API Key &amp; Rotate JWKS</h3>
             <form id="createKeyForm" class="form-stack">
               <label>Key Name <input type="text" id="keyName" value="Production Microservice Key" required /></label>
               <div class="form-row">
@@ -222,7 +332,7 @@
         </div>
       </section>
 
-      <!-- TAB 5: PROJECTS & RBAC USERS -->
+      <!-- TAB 8: PROJECTS & RBAC USERS -->
       <section id="tab-projects" class="tab-panel">
         <div class="grid-2">
           <div class="card">
@@ -260,7 +370,7 @@
         </div>
       </section>
 
-      <!-- TAB 6: API MARKETPLACE & SUBSCRIPTION PLANS -->
+      <!-- TAB 9: API MARKETPLACE & SUBSCRIPTION PLANS -->
       <section id="tab-marketplace" class="tab-panel">
         <div class="kpi-grid" id="plansContainer"></div>
         <div class="card">
@@ -282,7 +392,7 @@
         </div>
       </section>
 
-      <!-- TAB 7: WEBHOOKS & RETRY POLICIES -->
+      <!-- TAB 10: WEBHOOKS & SIMULATOR -->
       <section id="tab-webhooks" class="tab-panel">
         <div class="card">
           <h3>Configured Webhooks &amp; Exponential Retry Policies</h3>
@@ -303,7 +413,7 @@
         </div>
       </section>
 
-      <!-- TAB 8: SECURITY AUDIT & MFA -->
+      <!-- TAB 11: ZERO-TRUST SECURITY & THREAT INTEL -->
       <section id="tab-security" class="tab-panel">
         <div class="grid-2">
           <div class="card">
